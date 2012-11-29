@@ -21,8 +21,37 @@ static long cr0_status(void) {
 	return cr0;
 }
 
+static void cachecontrol_disable_caches(void) {
 
-int cachecontrol_read_procmem(char *buf, char **start, off_t offset,
+	//printk(KERN_NOTICE "Disabling caches...\n");
+
+	__asm__(
+			"push %rax\n\t"
+			"mov %cr0,%rax\n\t"
+			"or $(1<<30),%rax\n\t"
+			"mov %rax,%cr0\n\t"
+			"wbinvd\n\t"
+			"pop %rax\n\t");
+
+	//printk(KERN_NOTICE "Disabling caches...DONE\n");
+}
+
+static void cachecontrol_enable_caches(void) {
+
+	//printk(KERN_NOTICE "Enabling caches...\n");
+	
+	__asm__(
+			"push %rax\n\t"
+			"mov %cr0,%rax\n\t"
+			"and $(~(1<<30)),%rax\n\t"
+			"mov %rax,%cr0\n\t"
+			"pop %rax\n\t");
+
+	//printk(KERN_NOTICE "Enabling caches...DONE\n");
+}
+
+
+int cachecontrol_read_cr0(char *buf, char **start, off_t offset,
 		int count, int *eof, void *data) {
 
 	int r;
@@ -34,42 +63,34 @@ int cachecontrol_read_procmem(char *buf, char **start, off_t offset,
 	
 }
 
+int cachecontrol_read_disable(char *buf, char **start, off_t offset,
+		int count, int *eof, void *data) {
 
+	int r;
 
+	cachecontrol_disable_caches();
+	r = sprintf(buf, "OK: %02lX\n", cr0_status());
 
-
-
-
-
-
-static void disable_caches(void) {
-
-	printk(KERN_NOTICE "Disabling caches...\n");
-
-	__asm__(
-			"push %rax\n\t"
-			"mov %cr0,%rax\n\t"
-			"or $(1<<30),%rax\n\t"
-			"mov %rax,%cr0\n\t"
-			"wbinvd\n\t"
-			"pop %rax\n\t");
-
-	printk(KERN_NOTICE "Disabling caches...DONE\n");
+	*eof = 1;
+	return r;
 }
 
-static void enable_caches(void) {
+int cachecontrol_read_enable(char *buf, char **start, off_t offset,
+		int count, int *eof, void *data) {
 
-	printk(KERN_NOTICE "Enabling caches...\n");
-	
-	__asm__(
-			"push %rax\n\t"
-			"mov %cr0,%rax\n\t"
-			"and $(~(1<<30)),%rax\n\t"
-			"mov %rax,%cr0\n\t"
-			"pop %rax\n\t");
+	int r;
 
-	printk(KERN_NOTICE "Enabling caches...DONE\n");
+	cachecontrol_enable_caches();
+	r = sprintf(buf, "OK: %02lX\n", cr0_status());
+
+	*eof = 1;
+	return r;
 }
+
+
+
+
+
 
 
 static int cachecontrol_init(void) {
@@ -77,13 +98,21 @@ static int cachecontrol_init(void) {
 
 
 	create_proc_read_entry("cachecontrol-cr0", 0, NULL, 
-			cachecontrol_read_procmem, NULL);
+			cachecontrol_read_cr0, NULL);
+
+
+	create_proc_read_entry("cachecontrol-disable", 0, NULL, 
+			cachecontrol_read_disable, NULL);
+	create_proc_read_entry("cachecontrol-enable", 0, NULL, 
+			cachecontrol_read_enable, NULL);
 
 	return 0;
 }
 static void cachecontrol_exit(void) {
 	printk(KERN_NOTICE "Unloading cachecontrol...\n");
 	remove_proc_entry("cachecontrol-cr0", NULL);
+	remove_proc_entry("cachecontrol-disable", NULL);
+	remove_proc_entry("cachecontrol-enable", NULL);
 }
 
 module_init(cachecontrol_init);
