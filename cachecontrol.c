@@ -1,11 +1,14 @@
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/proc_fs.h>
 
 MODULE_LICENSE("Dual BSD/GPL");
 
-static inline void cr0_status(void) {
 
-	long cr0;
+
+static long cr0_status(void) {
+
+	volatile long cr0;
 
 	__asm__(
 			"mov %%cr0, %0;"
@@ -14,16 +17,35 @@ static inline void cr0_status(void) {
 			: /* no explicit clobbered regs */
 	       );
 
-	printk(KERN_DEBUG "cr0: %02lX\n", cr0);
+	//printk(KERN_DEBUG "cr0: %02lX\n", cr0);
+	return cr0;
+}
+
+
+int cachecontrol_read_procmem(char *buf, char **start, off_t offset,
+		int count, int *eof, void *data) {
+
+	int r;
+
+	r = sprintf(buf, "%02lX\n", cr0_status());
+
+	*eof = 1;
+	return r;
+	
 }
 
 
 
-static int cachecontrol_init(void) {
 
-	cr0_status();
+
+
+
+
+
+static void disable_caches(void) {
 
 	printk(KERN_NOTICE "Disabling caches...\n");
+
 	__asm__(
 			"push %rax\n\t"
 			"mov %cr0,%rax\n\t"
@@ -31,17 +53,12 @@ static int cachecontrol_init(void) {
 			"mov %rax,%cr0\n\t"
 			"wbinvd\n\t"
 			"pop %rax\n\t");
-			
 
 	printk(KERN_NOTICE "Disabling caches...DONE\n");
-	
-	cr0_status();
-	return 0;
 }
-static void cachecontrol_exit(void) {
-	
-	cr0_status();
-	
+
+static void enable_caches(void) {
+
 	printk(KERN_NOTICE "Enabling caches...\n");
 	
 	__asm__(
@@ -52,7 +69,21 @@ static void cachecontrol_exit(void) {
 			"pop %rax\n\t");
 
 	printk(KERN_NOTICE "Enabling caches...DONE\n");
-	cr0_status();		
+}
+
+
+static int cachecontrol_init(void) {
+	printk(KERN_NOTICE "Loading cachecontrol...\n");
+
+
+	create_proc_read_entry("cachecontrol-cr0", 0, NULL, 
+			cachecontrol_read_procmem, NULL);
+
+	return 0;
+}
+static void cachecontrol_exit(void) {
+	printk(KERN_NOTICE "Unloading cachecontrol...\n");
+	remove_proc_entry("cachecontrol-cr0", NULL);
 }
 
 module_init(cachecontrol_init);
