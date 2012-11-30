@@ -5,7 +5,6 @@
 MODULE_LICENSE("Dual BSD/GPL");
 
 
-
 static long cr0_status(void) {
 
 	volatile long cr0;
@@ -50,7 +49,6 @@ static void cachecontrol_enable_caches(void) {
 	//printk(KERN_NOTICE "Enabling caches...DONE\n");
 }
 
-
 int cachecontrol_read_cr0(char *buf, char **start, off_t offset,
 		int count, int *eof, void *data) {
 
@@ -87,20 +85,11 @@ int cachecontrol_read_enable(char *buf, char **start, off_t offset,
 	return r;
 }
 
-
-
-
-
-
-
 static int cachecontrol_init(void) {
 	printk(KERN_NOTICE "Loading cachecontrol...\n");
 
-
 	create_proc_read_entry("cachecontrol-cr0", 0, NULL, 
 			cachecontrol_read_cr0, NULL);
-
-
 	create_proc_read_entry("cachecontrol-disable", 0, NULL, 
 			cachecontrol_read_disable, NULL);
 	create_proc_read_entry("cachecontrol-enable", 0, NULL, 
@@ -108,8 +97,10 @@ static int cachecontrol_init(void) {
 
 	return 0;
 }
+
 static void cachecontrol_exit(void) {
 	printk(KERN_NOTICE "Unloading cachecontrol...\n");
+	
 	remove_proc_entry("cachecontrol-cr0", NULL);
 	remove_proc_entry("cachecontrol-disable", NULL);
 	remove_proc_entry("cachecontrol-enable", NULL);
