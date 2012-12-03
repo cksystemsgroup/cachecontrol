@@ -4,25 +4,21 @@
 
 MODULE_LICENSE("Dual BSD/GPL");
 
+//TODO: enable per-cpu execution
 
 static long cr0_status(void) {
 
 	volatile long cr0;
-
 	__asm__(
 			"mov %%cr0, %0;"
 			:"=r"(cr0)
 			: /* no input registers */
 			: /* no explicit clobbered regs */
 	       );
-
-	//printk(KERN_DEBUG "cr0: %02lX\n", cr0);
 	return cr0;
 }
 
 static void cachecontrol_disable_caches(void) {
-
-	//printk(KERN_NOTICE "Disabling caches...\n");
 
 	__asm__(
 			"push %rax\n\t"
@@ -31,44 +27,35 @@ static void cachecontrol_disable_caches(void) {
 			"mov %rax,%cr0\n\t"
 			"wbinvd\n\t"
 			"pop %rax\n\t");
-
-	//printk(KERN_NOTICE "Disabling caches...DONE\n");
 }
 
 static void cachecontrol_enable_caches(void) {
 
-	//printk(KERN_NOTICE "Enabling caches...\n");
-	
 	__asm__(
 			"push %rax\n\t"
 			"mov %cr0,%rax\n\t"
 			"and $(~(1<<30)),%rax\n\t"
 			"mov %rax,%cr0\n\t"
+			"wbinvd\n\t"
 			"pop %rax\n\t");
-
-	//printk(KERN_NOTICE "Enabling caches...DONE\n");
 }
 
 int cachecontrol_read_cr0(char *buf, char **start, off_t offset,
 		int count, int *eof, void *data) {
 
 	int r;
-
-	r = sprintf(buf, "%02lX\n", cr0_status());
-
+	//r = sprintf(buf, "%02lX\n", cr0_status());
+	r = sprintf(buf, "%ld\n", cr0_status());
 	*eof = 1;
 	return r;
-	
 }
 
 int cachecontrol_read_disable(char *buf, char **start, off_t offset,
 		int count, int *eof, void *data) {
 
 	int r;
-
 	cachecontrol_disable_caches();
 	r = sprintf(buf, "OK: %02lX\n", cr0_status());
-
 	*eof = 1;
 	return r;
 }
@@ -77,10 +64,8 @@ int cachecontrol_read_enable(char *buf, char **start, off_t offset,
 		int count, int *eof, void *data) {
 
 	int r;
-
 	cachecontrol_enable_caches();
 	r = sprintf(buf, "OK: %02lX\n", cr0_status());
-
 	*eof = 1;
 	return r;
 }
