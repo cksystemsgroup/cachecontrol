@@ -22,7 +22,7 @@ int main(int argc, char **argv) {
 	int i, j;
 	char memory[1024];
 
-	for (i = 0; i < 1000; ++i) {
+	for (i = 0; i < 100000; ++i) {
 		for (j = 0; j < 1023; ++j) {
 			memory[j] = memory[j+1]+1;
 		}
