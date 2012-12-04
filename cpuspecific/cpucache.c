@@ -4,44 +4,96 @@
 #include <string.h>
 #include <sched.h>
 
+cpu_set_t startup_set;
 
 static void where_am_i(void) {
 
 	int i;
 	cpu_set_t cs;
 	
-	if (sched_getaffinity(0, CPU_SETSIZE, &cs)) {
+	if (sched_getaffinity(0, sizeof(cpu_set_t), &cs)) {
 		perror("sched_getaffinity");
 		exit(EXIT_FAILURE);
 	}
-
-	//printf("%08lx\n", cs);
 
 	for (i = 0; i < CPU_SETSIZE; ++i) {
 		if (CPU_ISSET(i, &cs)) {
 			printf("I can run on core %d\n", i);
 		}
 	}
-
-	printf("done\n");
 }
 
 void select_cpu(int cpu_id) {
 	cpu_set_t cs;
 
-	where_am_i();
-
-	return;
-
 	CPU_ZERO(&cs);
 	CPU_SET(cpu_id, &cs);
-	if (sched_setaffinity(0, CPU_SETSIZE, &cs)) {
+	if (sched_setaffinity(0, sizeof(cpu_set_t), &cs)) {
 		perror("sched_setaffinity");
 		exit(EXIT_FAILURE);
 	}
+}
 
+void restore_startup_set(void) {
+	if (sched_setaffinity(0, sizeof(cpu_set_t), &startup_set)) {
+		perror("sched_setaffinity");
+		exit(EXIT_FAILURE);
+	}
+}
+
+void disable_cache(int cpu_id) {
+
+	select_cpu(cpu_id);
 	
-	where_am_i();
+	const char *filename = "/proc/cachecontrol-disable";
+	FILE *fp = fopen(filename, "r");
+	
+	if (fp == NULL) {
+		perror("fopen");
+		exit(EXIT_FAILURE);
+	}
+
+	char *buffer = NULL;
+	size_t len = 0;
+	size_t bytes_read;
+        if ((bytes_read = getline(&buffer, &len, fp)) == -1) {
+		perror("getline");
+		exit(EXIT_FAILURE);
+	}
+
+	printf("Disabled caches at %d: %s\n", cpu_id, buffer);
+
+	free(buffer);
+	fclose(fp);
+
+	restore_startup_set();
+}
+void enable_cache(int cpu_id) {
+
+	select_cpu(cpu_id);
+	
+	const char *filename = "/proc/cachecontrol-enable";
+	FILE *fp = fopen(filename, "r");
+	
+	if (fp == NULL) {
+		perror("fopen");
+		exit(EXIT_FAILURE);
+	}
+
+	char *buffer = NULL;
+	size_t len = 0;
+	size_t bytes_read;
+        if ((bytes_read = getline(&buffer, &len, fp)) == -1) {
+		perror("getline");
+		exit(EXIT_FAILURE);
+	}
+
+	printf("Enabled caches at %d: %s\n", cpu_id, buffer);
+
+	free(buffer);
+	fclose(fp);
+	
+	restore_startup_set();
 }
 
 /**
@@ -102,6 +154,18 @@ int get_arg_cpu_id(int argc, char **argv) {
 	}
 }
 
+void list_cache_status(void) {
+	int i;
+	for (i = 0; i < CPU_SETSIZE; ++i) {
+		if (CPU_ISSET(i, &startup_set)) {
+			select_cpu(i);
+			printf("%d: ", i);
+			print_cache_status();
+		}
+	}
+	restore_startup_set();
+}
+
 int main(int argc, char **argv) {
 
 	int cpu_id;
@@ -110,23 +174,23 @@ int main(int argc, char **argv) {
 		print_usage();
 	}
 
+	//store original cpu map
+	if (sched_getaffinity(0, sizeof(cpu_set_t), &startup_set)) {
+		perror("sched_getaffinity");
+		exit(EXIT_FAILURE);
+	}
+
 
 	if (strncmp("--enable", argv[1], 10) == 0) {
-		cpu_id = get_arg_cpu_id(argc, argv);	
+		cpu_id = get_arg_cpu_id(argc, argv);
+		enable_cache(cpu_id);	
 
 	} else if (strncmp("--disable", argv[1], 10) == 0) {
 		cpu_id = get_arg_cpu_id(argc, argv);	
+		disable_cache(cpu_id);	
 
 	} else if (strncmp("--list", argv[1], 10) == 0) {
-	
-		print_cache_status();
-
-
-		select_cpu(0);
-
-
-		//print_cache_status();
-
+		list_cache_status();
 	} else {
 		print_usage();
 	}

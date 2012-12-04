@@ -1,5 +1,5 @@
 env = Environment()
-env.Append( CPPFLAGS=['-Wall', '-g'] )
+env.Append( CFLAGS=['-Wall'] )
 
 
 env.Program('cpucache', 'cpucache.c')
